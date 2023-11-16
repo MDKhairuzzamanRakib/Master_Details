@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using Project1.Models;
+using Project1.Models.ViewModels;
 
 namespace Project1.Controllers
 {
@@ -29,7 +31,43 @@ namespace Project1.Controllers
         {
             return await _context.Candidates.ToListAsync();
         }
+        [HttpPost]
+        public async Task<ActionResult<CandidateSkill>> PostCandidateSkills([FromForm] CandidateVM vm)
+        {
+            var skillItems = JsonConvert.DeserializeObject<Skill[]>(vm.SkillsStringfy);
 
+            Candidate candidate = new Candidate
+            {
+                CandidateName = vm.CandidateName,
+                BirthDate = vm.BirthDate,
+                Fresher = vm.Fresher
+            };
+
+            if (vm.PictureFile!=null)
+            {
+                var webroot = _env.WebRootPath;
+                var fileName = DateTime.Now.Ticks.ToString() + Path.GetExtension(vm.PictureFile.FileName);
+                var filePath = Path.Combine(webroot, "Images", fileName);
+
+                FileStream fileStream = new FileStream(filePath,FileMode.Create);
+                await vm.PictureFile.CopyToAsync(fileStream);
+                await fileStream.FlushAsync();
+                fileStream.Close();
+                candidate.Picture = fileName;
+            }
+            foreach (var item in skillItems)
+            {
+                var candidateSkill = new CandidateSkill
+                {
+                    Candidate = candidate,
+                    CandidateId = candidate.CandidateId,
+                    SkillId = item.SkillId
+                };
+                _context.Add(candidateSkill);
+            }
+            await _context.SaveChangesAsync();
+            return Ok(candidate);
+        }
 
     }
 }
